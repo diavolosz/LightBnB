@@ -36,7 +36,6 @@ exports.getUserWithEmail = getUserWithEmail;
 
 
 
-
 /**
  * Get a single user from the database given their id.
  * @param {string} id The id of the user.
@@ -56,9 +55,6 @@ const getUserWithId = function(id) {
     });
 }
 exports.getUserWithId = getUserWithId;
-
-
-
 
 
 
@@ -83,6 +79,8 @@ const addUser =  function(user) {
 }
 exports.addUser = addUser;
 
+
+
 /// Reservations
 
 /**
@@ -91,9 +89,29 @@ exports.addUser = addUser;
  * @return {Promise<[{}]>} A promise to the reservations.
  */
 const getAllReservations = function(guest_id, limit = 10) {
-  return getAllProperties(null, 2);
+  const queryString = `SELECT properties.*,
+                              reservations.*,
+                              AVG(property_reviews.rating) as average_rating 
+                        FROM properties
+                        JOIN reservations ON properties.id = reservations.property_id
+                        JOIN property_reviews ON properties.id = property_reviews.property_id
+                        WHERE
+                          reservations.guest_id = $1 AND
+                          reservations.end_date < now()::date
+                        GROUP BY reservations.id, properties.id
+                        ORDER BY reservations.start_date
+                        LIMIT $2;`
+
+  return pool 
+  .query(queryString,[guest_id, limit])
+  .then((result) => {
+    console.log(result.rows)
+    return result.rows
+  })
 }
 exports.getAllReservations = getAllReservations;
+
+
 
 /// Properties
 
@@ -105,9 +123,16 @@ exports.getAllReservations = getAllReservations;
  */
 const getAllProperties = (options, limit = 10) => {
 
+  const queryString = `SELECT properties.*,
+                              reservations.*,
+                              AVG(property_reviews.rating) as average_rating 
+                        FROM properties
+                        JOIN reservations ON properties.id = reservations.property_id
+                        JOIN property_reviews ON properties.id = property_reviews.property_id
+                        GROUP BY reservations.id, properties.id
+                        LIMIT $1;`  
   return pool
-    .query(
-      `SELECT * FROM properties LIMIT $1`, [limit])
+    .query(queryString, [limit])
     .then((result) => {
       return result.rows
     })
